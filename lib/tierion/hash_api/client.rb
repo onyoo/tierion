@@ -109,6 +109,31 @@ module Tierion
         end
       end
 
+      def receipt_by_id(id)
+
+        auth_refresh unless logged_in?
+        options = { headers: { 'Authorization' => "Bearer #{@access_token}" } }
+        response = self.class.get("/receipts/#{id}", options)
+
+        if response.success? && response.parsed_response['receipt'].present?
+          receipt = JSON.parse(response.parsed_response['receipt'])
+          Hashie.symbolize_keys!(receipt)
+
+          if receipt.key?(:type) || receipt.key?('@type')
+            r = Tierion::HashApi::Receipt.new(receipt)
+            if r.valid?
+              return r
+            else
+              raise 'Invalid Receipt. Merkle tree proof validation failed.'
+            end
+          else
+            raise 'Invalid Receipt. Missing type key. Old chainpoint?'
+          end
+        else
+          return nil
+        end
+      end
+
       # Retrieve a receipt from its HashItem#id and the original SHA256 hash
       # used to create that HashItem.
       def receipt_from_id_and_hash(id, hash)
